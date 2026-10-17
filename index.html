@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#000000">
+<meta name="rwf-build" content="2026-10-17-tiers-per-elim-spin-hide">
 <title>Roulette with Friends — Pass-and-Play Party Game</title>
 <meta name="description" content="Roulette with Friends: a cartoon pass-and-play party game for 2-4 players on one device, plus Solo vs Bots.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%2339d353' stroke='%23a24bff' stroke-width='8'/%3E%3Ccircle cx='50' cy='28' r='9' fill='%23ffd21f'/%3E%3Ccircle cx='70' cy='60' r='9' fill='%23111'/%3E%3Ccircle cx='30' cy='60' r='9' fill='%23ffd21f'/%3E%3C/svg%3E">
@@ -143,6 +144,21 @@ h2{font-size:clamp(24px,7vw,36px);margin:0;font-weight:400;line-height:1.1}
 
 .logo-with{font-size:.55em;vertical-align:middle}
 
+/* spin hides bullets */
+.revolver .bullet{transition:opacity .35s ease}
+.revolver .q{opacity:0;transition:opacity .3s;text-shadow:none;font-family:"Bungee",Impact,sans-serif;pointer-events:none}
+.revolver.hide-bullets .bullet{opacity:0}
+.revolver.hide-bullets .q{opacity:.85;animation:qshimmer 1.4s ease-in-out infinite}
+@keyframes qshimmer{0%,100%{opacity:.35}50%{opacity:.95}}
+.revolver .chamber.sel .ring{transition:stroke .2s}
+/* tier-up banner */
+.tier-banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:6;background:linear-gradient(180deg,#2a1440,#170a26);border-radius:18px;padding:14px 22px;
+  box-shadow:inset 0 0 0 3px #a24bff,0 0 30px rgba(162,75,255,.55);animation:tierPop .35s cubic-bezier(.2,1.4,.4,1);white-space:nowrap}
+.tb-up{font-size:22px;color:#ffd21f}
+.tb-text{font-size:clamp(22px,7vw,32px)}
+.tb-sub{font-size:12px;letter-spacing:.1em;margin-top:2px}
+@keyframes tierPop{from{transform:translate(-50%,-50%) scale(.6);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
 </style>
 </head>
 <body>
@@ -191,6 +207,7 @@ h2{font-size:clamp(24px,7vw,36px);margin:0;font-weight:400;line-height:1.1}
     <div class="table">
       <div class="gun-host play-gun" data-size="play"></div>
       <div class="msg" id="msg" aria-live="polite"></div>
+      <div class="tier-banner hidden" id="tierBanner"><div class="tb-up">▲</div><div class="tb-text" id="tierBannerText">Tier 2 · 2 bullets</div><div class="tb-sub" id="tierBannerSub">+1 bullet</div></div>
       <div class="elim hidden" id="elim"><div class="elim-x">✖</div><div class="elim-text" id="elimText">Bot Vex has been eliminated</div></div>
     </div>
     <div class="panel">
@@ -237,7 +254,7 @@ h2{font-size:clamp(24px,7vw,36px);margin:0;font-weight:400;line-height:1.1}
     <div class="setup-mode">Solo Run Over · Reached</div>
     <h1 id="resTitle">Tier 1</h1>
     <div class="res-stats">
-      <div class="stat"><span class="k">Tiers cleared</span><span class="v" id="resCleared">0</span></div>
+      <div class="stat"><span class="k">Bots eliminated</span><span class="v" id="resCleared">0</span></div>
       <div class="stat"><span class="k">Shots survived</span><span class="v" id="resShots">0</span></div>
     </div>
     <form class="submit-box" id="submitForm" autocomplete="off" novalidate>
@@ -257,7 +274,7 @@ h2{font-size:clamp(24px,7vw,36px);margin:0;font-weight:400;line-height:1.1}
   <section class="screen" id="scr-lb">
     <button class="back btn ghost small" id="lbBack">‹ Back</button>
     <h2 id="lbTitle">Global Leaderboard</h2>
-    <p class="sub" id="lbSub">Solo mode · highest tier cleared, then shots survived</p>
+    <p class="sub" id="lbSub">Solo mode · highest tier reached, then shots survived</p>
     <div class="lb-me" id="lbMe"></div>
     <div class="lb-wrap"><table class="lb"><thead><tr><th>#</th><th>Name</th><th>Tier</th><th>Shots</th><th>Date</th></tr></thead><tbody id="lbBody"></tbody></table>
     <div class="lb-empty hidden" id="lbEmpty">No scores yet. Be the first!</div></div>
@@ -413,12 +430,17 @@ function mountGun(host){
     b.appendChild(mk('circle',{cx:x,cy:y,r:15,fill:`url(#brassG-${n})`,stroke:'#8a5a00','stroke-width':2.5}));
     b.appendChild(mk('circle',{cx:x,cy:y,r:6,fill:'#e8b400',stroke:'#8a5a00','stroke-width':1.5}));
     b.appendChild(mk('circle',{cx:x-5,cy:y-6,r:3,fill:'#fffbe0',opacity:.85}));
-    g.appendChild(b); chG.appendChild(g); chambers.push({g,b});
+    g.appendChild(b);
+    const q=mk('text',{class:'q',x:x,y:y+7.5,'text-anchor':'middle','font-size':20,'font-weight':900,fill:'#c9a2ff'}); q.textContent='?';
+    g.appendChild(q); chG.appendChild(g); chambers.push({g,b,q,x,y});
   }
   const api={
     svg, angle:0, loopId:0,
-    setAngle(a){ this.angle=a; cyl.setAttribute('transform',`rotate(${a} ${CX} ${CY})`); },
+    setAngle(a){ this.angle=a; cyl.setAttribute('transform',`rotate(${a} ${CX} ${CY})`);
+      if(this.hidden) chambers.forEach(c=>c.q.setAttribute('transform',`rotate(${-a} ${c.x} ${c.y})`)); }, // keep "?" upright
     setLoaded(arr){ arr.forEach((l,i)=>chambers[i].b.style.display=l?'':'none'); },
+    hidden:false,
+    setHidden(h){ this.hidden=!!h; svg.classList.toggle('hide-bullets',this.hidden); if(this.hidden) this.setAngle(this.angle); },
     select(i){ chambers.forEach((c,j)=>c.g.classList.toggle('sel',j===i)); },
     animateTo(target,dur,ease=t=>1-Math.pow(1-t,3)){
       const from=this.angle, t0=performance.now(); let last=Math.floor((from+30)/60);
@@ -455,7 +477,10 @@ function show(id){ $$('.screen').forEach(s=>s.classList.toggle('on',s.id==='scr-
 
 /* ================= config ================= */
 const SOLO={
-  tierBullets: tier=>Math.min(5,tier),        // Tier N = N bullets, capped at 5 (endless tiers after 5)
+  tierBullets: tier=>Math.min(5,tier),        // Tier N = N bullets, capped at 5 (tiers keep counting past 5)
+  tierUpPerElim: 1,                           // tier rises by this much every time a bot is eliminated
+  botSpinChance: .35,                         // bots sometimes spin first (hides bullets until their shot)
+  tierBannerMs: 1200,
   bots: 3,
   botNames:['Vex','Rook','Mara','Jinx','Nyx','Brick','Echo','Sable','Dax','Kip','Rune','Zed','Onyx','Pip','Grit'],
   thinkMs:[850,1500], aiElimMs:1500, humanDeadMs:3000, surviveAdvanceMs:1400,
@@ -466,7 +491,7 @@ const SOLO={
 const API = window.PTT_API || (/(^|\.)pull-the-trigger\.netlify\.app$/.test(location.hostname) ? '/api' : null);
 const LOCAL_LB = !API;
 const LocalBoard={
-  key:'ptt-local-lb',
+  key:'ptt-local-lb-v2',   // v2: tier = highest tier reached
   all(){ try{ return JSON.parse(localStorage.getItem(this.key)||'[]'); }catch(e){ return []; } },
   add(name,tier,shots){
     const e={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+rint(1e9)),name,tier,shots,ts:Date.now()};
@@ -555,7 +580,7 @@ function startTurn(){
   const p=S.players[S.cur]; setColor(p.color);
   S.count=bulletsFor(p);
   S.loaded=pickChambers(S.count);
-  const g=guns.play; g.setLoaded(S.loaded); g.select(-1);
+  const g=guns.play; g.setLoaded(S.loaded); g.select(-1); g.setHidden(false);
   $('#turnTitle').textContent=p.ai?`${p.name} Pulls the Trigger`:`${p.name} Pull the Trigger`;
   $('#loadedStat').textContent=`${S.count}/6 loaded`;
   $('#modeStat').textContent=isSolo()?`Tier ${S.run.tier}`:MODES[S.mode].short;
@@ -569,15 +594,26 @@ function startTurn(){
     setBusy(true);
     m.textContent=`${p.name} is thinking`; m.classList.add('show','thinking');
     const [a,b]=SOLO.thinkMs;
-    setTimeout(()=>{ if(S.screen==='play'&&S.players[S.cur]===p) takeShot(); }, a+rint(b-a));
+    setTimeout(async()=>{
+      if(!(S.screen==='play'&&S.players[S.cur]===p)) return;
+      if(Math.random()<SOLO.botSpinChance){ m.classList.remove('show','thinking'); await doSpin(); }
+      takeShot();
+    }, a+rint(b-a));
   } else setBusy(false);
 }
 function setBusy(b){ S.busy=b; $('#btnSpin').disabled=b; $('#btnShoot').disabled=b; }
 
-$('#btnSpin').onclick=async()=>{
-  if(S.busy) return; setBusy(true); $('#msg').classList.remove('show');
+// Spin: cosmetic for the outcome, but hides the bullets until the shot resolves
+async function doSpin(){
+  $('#msg').classList.remove('show');
   const g=guns.play; g.select(-1);
-  await g.spinToChamber(rint(6),2+rint(2),1500); // cosmetic only
+  setTimeout(()=>g.setHidden(true),250);
+  await g.spinToChamber(rint(6),2+rint(2),1500);
+  g.setHidden(true);
+}
+$('#btnSpin').onclick=async()=>{
+  if(S.busy) return; setBusy(true);
+  await doSpin();
   setBusy(false);
 };
 $('#btnShoot').onclick=()=>{ if(!S.busy) takeShot(); };
@@ -592,7 +628,8 @@ async function takeShot(){
   if(want===true||want===false){ const c=[0,1,2,3,4,5].filter(i=>S.loaded[i]===want); if(c.length) sel=c[rint(c.length)]; }
   S.lastSel=sel;
   await g.spinToChamber(sel,2+rint(2),1700);
-  g.select(sel); Snd.cock(); await wait(550);
+  Snd.cock(); await wait(550);
+  g.setHidden(false); g.select(sel);   // reveal all bullets at the moment the shot resolves
   S.turns++;
   if(S.loaded[sel]){
     g.fire(); Snd.shot(); vib(p.ai?[60]:[90,40,220]);
@@ -605,7 +642,9 @@ async function takeShot(){
       S.elimShownAt=performance.now();
       await wait(SOLO.aiElimMs);
       $('#elim').classList.add('hidden');
-      if(alive().length===1&&!alive()[0].ai) return tierCleared();
+      S.run.elims++;
+      await tierUp();
+      if(alive().length===1&&!alive()[0].ai) return newBotSet();
       S.cur=nextAlive(S.cur); return startTurn();
     }
     $('#deadSub').textContent=`${p.name} is out`;
@@ -647,14 +686,14 @@ function goMenu(){ setColor(MENU_COLOR); guns.splash.loop(false); show('menu'); 
 /* ================= solo mode ================= */
 function startSoloRun(){
   S.mode='solo';
-  S.run={tier:1,cleared:0,shots:0,token:null,startedAt:Date.now(),submitted:false};
+  S.run={tier:1,elims:0,sets:0,shots:0,token:null,startedAt:Date.now(),submitted:false};
   const run=S.run;
   if(LOCAL_LB) run.token='local'; else fetch(API+'/run-start',{method:'POST'}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.token) run.token=j.token; }).catch(()=>{});
   soloTierSplash();
 }
 function soloTierSplash(){
   const t=S.run.tier, b=SOLO.tierBullets(t);
-  startLoading({title:`Solo Tier ${t}`,sub:`${b} bullet${b>1?'s':''} · ${SOLO.bots} bots`,bullets:b,color:COLORS[0],then:newSoloTier});
+  startLoading({title:S.run.sets?`New Bots · Tier ${t}`:`Solo Tier ${t}`,sub:`${b} bullet${b>1?'s':''} · ${SOLO.bots} bots`,bullets:b,color:COLORS[0],then:newSoloTier});
 }
 function newSoloTier(){
   const pool=SOLO.botNames.slice();
@@ -663,14 +702,19 @@ function newSoloTier(){
   for(let i=0;i<SOLO.bots;i++) S.players.push({n:i+2,name:`Bot ${pool[i]}`,short:`Bot ${pool[i]}`,ai:true,alive:true,color:COLORS[(i+1)%4]});
   S.cur=0; S.turns=0; startTurn();
 }
-function tierCleared(){
-  S.run.cleared=S.run.tier; S.run.tier++;
-  soloTierSplash();
+async function tierUp(){
+  const r=S.run; r.tier+=SOLO.tierUpPerElim; const b=SOLO.tierBullets(r.tier);
+  const el=$('#tierBanner'); $('#tierBannerText').textContent=`Tier ${r.tier} · ${b} bullet${b>1?'s':''}`;
+  $('#tierBannerSub').textContent=b>=5&&SOLO.tierBullets(r.tier-1)>=5?'Max 5/6 loaded':'+1 bullet';
+  $('#modeStat').textContent=`Tier ${r.tier}`;
+  el.classList.remove('hidden'); Snd.cock(); S.bannerShownAt=performance.now();
+  await wait(SOLO.tierBannerMs); el.classList.add('hidden');
 }
+function newBotSet(){ S.run.sets++; soloTierSplash(); }
 function endRun(){
   const r=S.run; setColor(COLORS[0]);
   $('#resTitle').textContent=`Tier ${r.tier}`;
-  $('#resCleared').textContent=r.cleared; $('#resShots').textContent=r.shots;
+  $('#resCleared').textContent=r.elims; $('#resShots').textContent=r.shots;
   $('#lbName').value=localStorage.getItem('ptt-name')||'';
   $('#btnSubmit').disabled=false; $('#lbName').disabled=false;
   $('#lbStatus').textContent=r.token?'':'Connecting to leaderboard…';
@@ -687,7 +731,7 @@ $('#submitForm').onsubmit=async e=>{
   if(!NAME_RE.test(name)){ st.textContent='Use 3–16 letters, numbers, spaces, _ . -'; return; }
   if(nameIsRude(name)){ st.textContent='Please pick a different name'; return; }
   if(LOCAL_LB){
-    const j=LocalBoard.add(name,r.cleared,r.shots); r.submitted=true; $('#lbName').disabled=true; $('#btnSubmit').disabled=true;
+    const j=LocalBoard.add(name,r.tier,r.shots); r.submitted=true; $('#lbName').disabled=true; $('#btnSubmit').disabled=true;
     localStorage.setItem('ptt-name',name);
     const ids=JSON.parse(localStorage.getItem('ptt-ids')||'[]'); ids.push(j.id); localStorage.setItem('ptt-ids',JSON.stringify(ids.slice(-50)));
     st.textContent=j.rank?`Saved! You're #${j.rank} on this device.`:'Saved!'; return;
@@ -695,7 +739,7 @@ $('#submitForm').onsubmit=async e=>{
   if(!r.token){ st.textContent='Leaderboard offline for this run (no run token).'; return; }
   $('#btnSubmit').disabled=true; st.textContent='Submitting…';
   try{
-    const res=await fetch(API+'/submit',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:r.token,name,tier:r.cleared,shots:r.shots})});
+    const res=await fetch(API+'/submit',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:r.token,name,tier:r.tier,shots:r.shots})});
     const j=await res.json().catch(()=>({}));
     if(!res.ok){ st.textContent=j.error||`Submit failed (${res.status})`; $('#btnSubmit').disabled=false; return; }
     r.submitted=true; $('#lbName').disabled=true;
@@ -733,7 +777,7 @@ $('#lbBack').onclick=()=>{ if(S.lbReturn==='results'){ setColor(COLORS[0]); show
 /* leaderboard labels */
 if(LOCAL_LB){
   $('#lbTitle').textContent='Local leaderboard (this device)';
-  $('#lbSub').textContent='Solo mode · scores saved only in this browser · highest tier cleared, then shots survived';
+  $('#lbSub').textContent='Solo mode · scores saved only in this browser · highest tier reached, then shots survived';
   $('#lbNameLabel').textContent='Name for the local leaderboard (this device)';
   $('#btnLbMenu').textContent='🏆 Local Leaderboard';
 }
